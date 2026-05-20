@@ -8,8 +8,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { background-color: #f8f9fa; }
         .bg-pemasukan { background-color: #d1e7dd !important; color: #0f5132 !important; }
@@ -17,9 +15,13 @@
         .text-pemasukan { color: #198754 !important; font-weight: bold; }
         .text-pengeluaran { color: #dc3545 !important; font-weight: bold; }
         
-        /* Memberikan efek kursor tangan saat mouse diarahkan ke logo agar Admin tahu itu bisa diklik */
         .rahasia-admin { cursor: pointer; user-select: none; }
         
+        /* Modifikasi tampilan jam dan jadwal sholat */
+        .waktu-panel { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; }
+        .sholat-item { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(5px); transition: 0.3s; }
+        .sholat-item:hover { background: rgba(255, 255, 255, 0.2); }
+
         @media print {
             .d-print-none { display: none !important; }
             body { background-color: #fff; }
@@ -33,7 +35,6 @@
     <!-- Navbar -->
     <nav class="navbar navbar-dark bg-dark shadow-sm d-print-none mb-4">
         <div class="container">
-            <!-- LOGO RAHASIA: Klik bagian ini untuk buka/tutup akses admin -->
             <span class="navbar-brand mb-0 h1 rahasia-admin" onclick="toggleLock()" title="Sistem Informasi Keuangan">
                 <i class="bi bi-wallet2 me-2" id="logo-icon"></i>Keuangan PERMATA
             </span>
@@ -81,7 +82,7 @@
         </div>
 
         <div class="row g-4">
-            <!-- Form Input Transaksi (Disembunyikan jika tidak punya akses) -->
+            <!-- Form Input Transaksi -->
             <div class="col-lg-4 d-print-none" id="form-container" style="display: none;">
                 <div class="card shadow-sm border-0 border-top border-primary border-3">
                     <div class="card-header bg-white text-primary fw-bold" id="form-title">
@@ -118,12 +119,12 @@
 
                             <div class="mb-3">
                                 <label for="nominal" class="form-label fw-semibold small">Nominal (Rp)</label>
-                                <input type="number" class="form-control form-control-sm" id="nominal" placeholder="Misal: 150000" required min="1">
+                                <input type="number" class="form-control form-control-sm" id="nominal" required min="1">
                             </div>
 
                             <div class="mb-3">
                                 <label for="keterangan" class="form-label fw-semibold small">Keterangan</label>
-                                <textarea class="form-control form-control-sm" id="keterangan" rows="2" placeholder="Catatan tambahan..."></textarea>
+                                <textarea class="form-control form-control-sm" id="keterangan" rows="2"></textarea>
                             </div>
 
                             <div class="d-grid gap-2">
@@ -133,28 +134,32 @@
                         </form>
                     </div>
                 </div>
-
-                <!-- Backup Data Card (Hanya untuk Admin) -->
-                <div class="card shadow-sm border-0 mt-3 bg-light">
-                    <div class="card-body py-2 d-flex justify-content-between align-items-center">
-                        <span class="small fw-bold text-muted">Backup Data:</span>
-                        <div>
-                            <button class="btn btn-sm btn-outline-secondary me-1" onclick="eksporData()" title="Unduh File Backup"><i class="bi bi-download"></i></button>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('import-file').click()" title="Unggah File Backup"><i class="bi bi-upload"></i></button>
-                            <input type="file" id="import-file" style="display:none;" accept=".json" onchange="imporData(this)">
-                        </div>
-                    </div>
-                </div>
             </div>
 
-            <!-- Tabel Data & Laporan (Sisi Kanan, Lebar penuh jika form disembunyikan) -->
+            <!-- Tabel Data & Laporan -->
             <div class="col-lg-12" id="data-container">
                 
-                <!-- Grafik Pertumbuhan Transaksi -->
-                <div class="card shadow-sm border-0 mb-4 d-print-none">
-                    <div class="card-body">
-                        <h6 class="fw-bold mb-3"><i class="bi bi-bar-chart-line-fill me-2 text-primary"></i>Grafik Pertumbuhan Keuangan Per Bulan</h6>
-                        <canvas id="chartTransaksi" height="80"></canvas>
+                <!-- JAM DIGITAL & JADWAL SHOLAT -->
+                <div class="card shadow-sm border-0 mb-4 d-print-none waktu-panel rounded-3">
+                    <div class="card-body p-4">
+                        <div class="row align-items-center text-center text-md-start">
+                            <!-- Sektor Kiri: Jam & Kalender -->
+                            <div class="col-md-5 mb-4 mb-md-0 border-md-end border-light border-opacity-25">
+                                <div id="jam-digital" class="display-3 fw-bold" style="font-variant-numeric: tabular-nums; letter-spacing: 2px;">00:00:00</div>
+                                <div id="tanggal-masehi" class="fs-5 mt-1 opacity-75">Memuat tanggal...</div>
+                                <div id="tanggal-hijriah" class="text-warning fw-semibold mt-1"><i class="bi bi-moon-stars-fill me-1"></i> Memuat hijriah...</div>
+                            </div>
+                            
+                            <!-- Sektor Kanan: Jadwal Sholat Kuningan -->
+                            <div class="col-md-7 ps-md-4">
+                                <h6 class="fw-bold mb-3 text-light opacity-75">
+                                    <i class="bi bi-geo-alt-fill text-danger me-1"></i>Jadwal Sholat Kab. Kuningan
+                                </h6>
+                                <div class="d-flex justify-content-between text-center gap-2 flex-nowrap overflow-auto pb-2" id="jadwal-sholat-container">
+                                    <span class="spinner-border spinner-border-sm text-light" role="status"></span> Memuat...
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -162,10 +167,10 @@
                 <div class="card shadow-sm border-0 mb-3 d-print-none bg-light">
                     <div class="card-body py-2 row g-2 align-items-center">
                         <div class="col-md-4">
-                            <input type="month" id="filter-bulan" class="form-control form-control-sm" onchange="muatData()" title="Pilih Bulan">
+                            <input type="month" id="filter-bulan" class="form-control form-control-sm" onchange="muatDataVisual()">
                         </div>
                         <div class="col-md-4">
-                            <select id="urutkan-berdasarkan" class="form-select form-select-sm" onchange="muatData()">
+                            <select id="urutkan-berdasarkan" class="form-select form-select-sm" onchange="muatDataVisual()">
                                 <option value="tanggal-desc">Urut: Tanggal Terbaru</option>
                                 <option value="tanggal-asc">Urut: Tanggal Terlama</option>
                                 <option value="jenis-asc">Urut: Jenis (A-Z)</option>
@@ -173,7 +178,7 @@
                         </div>
                         <div class="col-md-4 d-flex gap-2">
                             <button class="btn btn-sm btn-success w-100" onclick="window.print()"><i class="bi bi-printer me-1"></i> Cetak / PDF</button>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="resetFilter()" title="Reset Filter"><i class="bi bi-arrow-clockwise"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="resetFilter()"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
                     </div>
                 </div>
@@ -200,7 +205,6 @@
                                     <th style="width: 20%">Jenis Transaksi</th>
                                     <th>Keterangan</th>
                                     <th style="width: 20%" class="text-end">Nominal</th>
-                                    <!-- Header Aksi disembunyikan jika bukan admin -->
                                     <th style="width: 10%" class="text-center d-print-none" id="header-aksi" style="display: none;">Aksi</th>
                                 </tr>
                             </thead>
@@ -220,328 +224,342 @@
 
     <!-- Logika Aplikasi -->
     <script>
-    // --- KONFIGURASI KEAMANAN & DATABASE ---
-const ADMIN_PIN = "permata123";
-let isAdmin = false; 
+        // --- KONFIGURASI KEAMANAN & DATABASE ---
+        const ADMIN_PIN = "permata123";
+        let isAdmin = false; 
 
-// PASTE URL DARI GOOGLE APPS SCRIPT DI SINI:
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxi4X9wDnRPGg_j1TqEUqvzO4igiPmYriDYQztx42r5s1dAus2zSAcFm9ok0ZxEHVyQaA/exec"; 
+        // PASTE URL DARI GOOGLE APPS SCRIPT DI SINI:
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxi4X9wDnRPGg_j1TqEUqvzO4igiPmYriDYQztx42r5s1dAus2zSAcFm9ok0ZxEHVyQaA/exec"; 
 
-let dataTransaksi = [];
-let chartInstance = null;
+        let dataTransaksi = [];
 
-document.getElementById('transaksi-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    if(isAdmin) simpanTransaksi();
-});
-
-// ==========================================
-// FUNGSI LOCK & UNLOCK
-// ==========================================
-function toggleLock() {
-    if (isAdmin) {
-        isAdmin = false;
-        alert("Akses Admin ditutup. Mode Publik diaktifkan.");
-        renderUIAccess();
-    } else {
-        const inputPin = prompt("Identifikasi Bendahara:");
-        if (inputPin === ADMIN_PIN) {
-            isAdmin = true;
-            renderUIAccess();
-        } else if (inputPin !== null) {
-            alert("Akses ditolak.");
-        }
-    }
-}
-
-function renderUIAccess() {
-    const formContainer = document.getElementById('form-container');
-    const dataContainer = document.getElementById('data-container');
-    const headerAksi = document.getElementById('header-aksi');
-    const logoIcon = document.getElementById('logo-icon');
-
-    if (isAdmin) {
-        formContainer.style.display = 'block';
-        dataContainer.classList.replace('col-lg-12', 'col-lg-8');
-        headerAksi.style.display = 'table-cell';
-        logoIcon.classList.replace('bi-wallet2', 'bi-unlock-fill');
-        logoIcon.classList.add('text-warning');
-    } else {
-        formContainer.style.display = 'none';
-        dataContainer.classList.replace('col-lg-8', 'col-lg-12');
-        headerAksi.style.display = 'none';
-        logoIcon.classList.replace('bi-unlock-fill', 'bi-wallet2');
-        logoIcon.classList.remove('text-warning');
-        resetForm(); 
-    }
-    muatDataVisual();
-}
-
-// ==========================================
-// KONEKSI KE GOOGLE SHEETS
-// ==========================================
-
-// Ambil data pertama kali saat web dibuka
-async function tarikDataDariSheets() {
-    document.getElementById('total-saldo').innerText = "Loading...";
-    try {
-        const response = await fetch(SCRIPT_URL);
-        const data = await response.json();
-        // Pastikan tipe data sesuai
-        dataTransaksi = data.map(item => ({
-            ...item,
-            id: parseInt(item.id),
-            nominal: parseFloat(item.nominal)
-        }));
-        muatDataVisual();
-    } catch (err) {
-        console.error("Gagal menarik data:", err);
-        document.getElementById('total-saldo').innerText = "Gagal Koneksi";
-    }
-}
-
-// Simpan atau Edit ke Sheets
-async function simpanTransaksi() {
-    const btnSubmit = document.getElementById('btn-submit');
-    const teksAsli = btnSubmit.innerText;
-    btnSubmit.innerText = "Menyimpan...";
-    btnSubmit.disabled = true;
-
-    const idInput = document.getElementById('transaksi-id').value;
-    const payload = {
-        id: idInput ? parseInt(idInput) : Date.now(),
-        tipe: document.querySelector('input[name="tipe"]:checked').value,
-        tanggal: document.getElementById('tanggal').value,
-        jenis: document.getElementById('jenis').value.trim(),
-        nominal: parseFloat(document.getElementById('nominal').value),
-        keterangan: document.getElementById('keterangan').value.trim()
-    };
-
-    // Update UI Instan (Optimistic Update)
-    if (idInput) {
-        const index = dataTransaksi.findIndex(item => item.id == idInput);
-        if (index !== -1) dataTransaksi[index] = payload;
-    } else {
-        dataTransaksi.push(payload);
-    }
-    muatDataVisual();
-    resetForm();
-
-    // Proses sinkronisasi ke Database di latar belakang
-    try {
-        await fetch(SCRIPT_URL + '?action=simpan', {
-            method: 'POST',
-            body: JSON.stringify(payload)
+        document.getElementById('transaksi-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            if(isAdmin) simpanTransaksi();
         });
-    } catch(err) {
-        alert("Gagal sinkronisasi ke database. Periksa koneksi.");
-    } finally {
-        btnSubmit.innerText = teksAsli;
-        btnSubmit.disabled = false;
-    }
-}
 
-async function aksiHapus(id) {
-    if (!isAdmin) return;
-    if (confirm("Hapus data transaksi ini secara permanen dari Database?")) {
-        // Update UI Instan
-        dataTransaksi = dataTransaksi.filter(item => item.id !== id);
-        muatDataVisual();
+        // ==========================================
+        // JAM DIGITAL & JADWAL SHOLAT KUNINGAN
+        // ==========================================
+        function jalankanJam() {
+            const elJam = document.getElementById('jam-digital');
+            const elMasehi = document.getElementById('tanggal-masehi');
+            const elHijriah = document.getElementById('tanggal-hijriah');
 
-        // Hapus dari Sheets
-        try {
-            await fetch(SCRIPT_URL + '?action=hapus&id=' + id, { method: 'POST' });
-        } catch(err) {
-            console.error(err);
+            setInterval(() => {
+                const now = new Date();
+                
+                // Format Jam (HH:MM:SS)
+                elJam.innerText = now.toLocaleTimeString('id-ID', { hour12: false });
+                
+                // Format Masehi
+                elMasehi.innerText = now.toLocaleDateString('id-ID', { 
+                    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
+                });
+
+            }, 1000); // Update setiap 1 detik
+
+            // Format Hijriah (Hanya dipanggil sekali saat load/refresh agar tidak berat)
+            const today = new Date();
+            try {
+                const hijriFormatter = new Intl.DateTimeFormat('id-u-ca-islamic', {
+                    day: 'numeric', month: 'long', year: 'numeric'
+                });
+                elHijriah.innerHTML = `<i class="bi bi-moon-stars-fill me-1"></i> ${hijriFormatter.format(today)} H`;
+            } catch (e) {
+                elHijriah.innerText = "Kalender Hijriah tidak didukung browser ini.";
+            }
         }
-    }
-}
 
-function aksiEdit(id) {
-    if (!isAdmin) return;
-    const transaksi = dataTransaksi.find(item => item.id === id);
-    if (!transaksi) return;
+        async function tarikJadwalSholat() {
+            const container = document.getElementById('jadwal-sholat-container');
+            try {
+                // Aladhan API: city=Kuningan, country=Indonesia, method=11 (MUI)
+                const response = await fetch('https://api.aladhan.com/v1/timingsByCity?city=Kuningan&country=Indonesia&method=11');
+                const result = await response.json();
+                
+                if(result.code === 200) {
+                    const times = result.data.timings;
+                    
+                    // Struktur tampilan tiap jadwal sholat
+                    container.innerHTML = `
+                        <div class="sholat-item rounded p-2 flex-fill border border-light border-opacity-25">
+                            <div class="small opacity-75">Subuh</div>
+                            <div class="fw-bold fs-5">${times.Fajr}</div>
+                        </div>
+                        <div class="sholat-item rounded p-2 flex-fill border border-light border-opacity-25">
+                            <div class="small opacity-75">Dzuhur</div>
+                            <div class="fw-bold fs-5">${times.Dhuhr}</div>
+                        </div>
+                        <div class="sholat-item rounded p-2 flex-fill border border-light border-opacity-25">
+                            <div class="small opacity-75">Ashar</div>
+                            <div class="fw-bold fs-5">${times.Asr}</div>
+                        </div>
+                        <div class="sholat-item rounded p-2 flex-fill border border-light border-opacity-25">
+                            <div class="small opacity-75">Maghrib</div>
+                            <div class="fw-bold fs-5">${times.Maghrib}</div>
+                        </div>
+                        <div class="sholat-item rounded p-2 flex-fill border border-light border-opacity-25">
+                            <div class="small opacity-75">Isya</div>
+                            <div class="fw-bold fs-5">${times.Isha}</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                container.innerHTML = '<span class="text-danger bg-white px-2 rounded">Gagal memuat jadwal sholat.</span>';
+            }
+        }
 
-    document.getElementById('transaksi-id').value = transaksi.id;
-    document.getElementById('tanggal').value = transaksi.tanggal;
-    document.getElementById('jenis').value = transaksi.jenis;
-    document.getElementById('nominal').value = transaksi.nominal;
-    document.getElementById('keterangan').value = transaksi.keterangan;
-    document.getElementById(`tipe-${transaksi.tipe}`).checked = true;
+        // ==========================================
+        // FUNGSI LOCK & UNLOCK
+        // ==========================================
+        function toggleLock() {
+            if (isAdmin) {
+                isAdmin = false;
+                alert("Akses Admin ditutup. Mode Publik diaktifkan.");
+                renderUIAccess();
+            } else {
+                const inputPin = prompt("Identifikasi Bendahara:");
+                if (inputPin === ADMIN_PIN) {
+                    isAdmin = true;
+                    renderUIAccess();
+                } else if (inputPin !== null) {
+                    alert("Akses ditolak.");
+                }
+            }
+        }
 
-    document.getElementById('form-title').innerHTML = `<i class="bi bi-pencil-square me-1"></i> Edit Transaksi`;
-    document.getElementById('btn-submit').innerText = "Simpan Perubahan";
-    document.getElementById('btn-submit').classList.replace('btn-primary', 'btn-warning');
-    document.getElementById('btn-batal').style.display = 'block';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
+        function renderUIAccess() {
+            const formContainer = document.getElementById('form-container');
+            const dataContainer = document.getElementById('data-container');
+            const headerAksi = document.getElementById('header-aksi');
+            const logoIcon = document.getElementById('logo-icon');
 
-function resetForm() {
-    document.getElementById('transaksi-form').reset();
-    document.getElementById('transaksi-id').value = '';
-    document.getElementById('form-title').innerHTML = `<i class="bi bi-plus-circle me-1"></i> Input Transaksi Baru`;
-    document.getElementById('btn-submit').innerText = "Simpan Data";
-    document.getElementById('btn-submit').classList.replace('btn-warning', 'btn-primary');
-    document.getElementById('btn-batal').style.display = 'none';
-    const hariIni = new Date().toISOString().split('T')[0];
-    document.getElementById('tanggal').value = hariIni;
-}
+            if (isAdmin) {
+                formContainer.style.display = 'block';
+                dataContainer.classList.replace('col-lg-12', 'col-lg-8');
+                headerAksi.style.display = 'table-cell';
+                logoIcon.classList.replace('bi-wallet2', 'bi-unlock-fill');
+                logoIcon.classList.add('text-warning');
+            } else {
+                formContainer.style.display = 'none';
+                dataContainer.classList.replace('col-lg-8', 'col-lg-12');
+                headerAksi.style.display = 'none';
+                logoIcon.classList.replace('bi-unlock-fill', 'bi-wallet2');
+                logoIcon.classList.remove('text-warning');
+                resetForm(); 
+            }
+            muatDataVisual();
+        }
 
-// ==========================================
-// FUNGSI UMUM & FORMATTING
-// ==========================================
-function formatRupiah(angka) { return 'Rp ' + parseInt(angka).toLocaleString('id-ID'); }
-function formatTanggalIndo(stringTanggal) {
-    if(!stringTanggal) return '-';
-    // Menghindari error timezone GAS dengan memecah string YYYY-MM-DD
-    const parts = stringTanggal.split('T')[0].split('-');
-    if(parts.length !== 3) return stringTanggal;
-    const opsi = { year: 'numeric', month: 'short', day: 'numeric' };
-    return new Date(parts[0], parts[1]-1, parts[2]).toLocaleDateString('id-ID', opsi);
-}
+        // ==========================================
+        // KONEKSI KE GOOGLE SHEETS
+        // ==========================================
+        async function tarikDataDariSheets() {
+            document.getElementById('total-saldo').innerText = "Loading...";
+            try {
+                const response = await fetch(SCRIPT_URL);
+                const data = await response.json();
+                dataTransaksi = data.map(item => ({
+                    ...item,
+                    id: parseInt(item.id),
+                    nominal: parseFloat(item.nominal)
+                }));
+                muatDataVisual();
+            } catch (err) {
+                console.error("Gagal menarik data:", err);
+                document.getElementById('total-saldo').innerText = "Gagal Koneksi";
+            }
+        }
 
-// ==========================================
-// RENDER UI & CHART
-// ==========================================
-function muatDataVisual() {
-    const filterBulan = document.getElementById('filter-bulan').value;
-    const urutkan = document.getElementById('urutkan-berdasarkan').value;
-    
-    let dataProses = [...dataTransaksi];
+        async function simpanTransaksi() {
+            const btnSubmit = document.getElementById('btn-submit');
+            const teksAsli = btnSubmit.innerText;
+            btnSubmit.innerText = "Menyimpan...";
+            btnSubmit.disabled = true;
 
-    if (filterBulan) {
-        dataProses = dataProses.filter(item => String(item.tanggal).startsWith(filterBulan));
-        const [thn, bln] = filterBulan.split('-');
-        document.getElementById('print-period-text').innerText = "Periode: " + new Date(thn, bln - 1).toLocaleString('id-ID', { month: 'long', year: 'numeric' });
-    } else {
-        document.getElementById('print-period-text').innerText = "Semua Riwayat Transaksi";
-    }
+            const idInput = document.getElementById('transaksi-id').value;
+            const payload = {
+                id: idInput ? parseInt(idInput) : Date.now(),
+                tipe: document.querySelector('input[name="tipe"]:checked').value,
+                tanggal: document.getElementById('tanggal').value,
+                jenis: document.getElementById('jenis').value.trim(),
+                nominal: parseFloat(document.getElementById('nominal').value),
+                keterangan: document.getElementById('keterangan').value.trim()
+            };
 
-    if (urutkan === 'tanggal-desc') dataProses.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
-    else if (urutkan === 'tanggal-asc') dataProses.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
-    else if (urutkan === 'jenis-asc') dataProses.sort((a, b) => a.jenis.localeCompare(b.jenis));
+            if (idInput) {
+                const index = dataTransaksi.findIndex(item => item.id == idInput);
+                if (index !== -1) dataTransaksi[index] = payload;
+            } else {
+                dataTransaksi.push(payload);
+            }
+            muatDataVisual();
+            resetForm();
 
-    hitungDashboard(dataProses);
-    hitungJumlahPerJenis(dataProses);
-    renderTabel(dataProses);
-    updateDatalistJenis();
-    renderChart(dataTransaksi); 
-}
+            try {
+                await fetch(SCRIPT_URL + '?action=simpan', { method: 'POST', body: JSON.stringify(payload) });
+            } catch(err) {
+                alert("Gagal sinkronisasi ke database. Periksa koneksi.");
+            } finally {
+                btnSubmit.innerText = teksAsli;
+                btnSubmit.disabled = false;
+            }
+        }
 
-function hitungDashboard(data) {
-    let masuk = 0, keluar = 0;
-    data.forEach(item => { item.tipe === 'pemasukan' ? masuk += item.nominal : keluar += item.nominal; });
-    document.getElementById('total-pemasukan').innerText = formatRupiah(masuk);
-    document.getElementById('total-pengeluaran').innerText = formatRupiah(keluar);
-    document.getElementById('total-saldo').innerText = formatRupiah(masuk - keluar);
-    document.getElementById('total-item-count').innerText = data.length + " Transaksi";
-}
+        async function aksiHapus(id) {
+            if (!isAdmin) return;
+            if (confirm("Hapus data transaksi ini secara permanen dari Database?")) {
+                dataTransaksi = dataTransaksi.filter(item => item.id !== id);
+                muatDataVisual();
+                try { await fetch(SCRIPT_URL + '?action=hapus&id=' + id, { method: 'POST' }); } 
+                catch(err) { console.error(err); }
+            }
+        }
 
-function hitungJumlahPerJenis(data) {
-    const rekap = {};
-    data.forEach(item => {
-        if (!rekap[item.jenis]) rekap[item.jenis] = { pemasukan: 0, pengeluaran: 0 };
-        item.tipe === 'pemasukan' ? rekap[item.jenis].pemasukan += item.nominal : rekap[item.jenis].pengeluaran += item.nominal;
-    });
+        function aksiEdit(id) {
+            if (!isAdmin) return;
+            const transaksi = dataTransaksi.find(item => item.id === id);
+            if (!transaksi) return;
 
-    const container = document.getElementById('rekap-jenis-container');
-    container.innerHTML = '';
-    const keys = Object.keys(rekap);
-    if (keys.length === 0) return container.innerHTML = '<span class="text-muted small">Belum ada data.</span>';
+            document.getElementById('transaksi-id').value = transaksi.id;
+            document.getElementById('tanggal').value = transaksi.tanggal;
+            document.getElementById('jenis').value = transaksi.jenis;
+            document.getElementById('nominal').value = transaksi.nominal;
+            document.getElementById('keterangan').value = transaksi.keterangan;
+            document.getElementById(`tipe-${transaksi.tipe}`).checked = true;
 
-    keys.forEach(jenis => {
-        let badgeHTML = '';
-        if (rekap[jenis].pemasukan > 0) badgeHTML += `<span class="badge bg-pemasukan border me-1">${jenis} (+): ${formatRupiah(rekap[jenis].pemasukan)}</span>`;
-        if (rekap[jenis].pengeluaran > 0) badgeHTML += `<span class="badge bg-pengeluaran border">${jenis} (-): ${formatRupiah(rekap[jenis].pengeluaran)}</span>`;
-        container.innerHTML += `<div class="p-1 border rounded bg-light small d-inline-block">${badgeHTML}</div>`;
-    });
-}
+            document.getElementById('form-title').innerHTML = `<i class="bi bi-pencil-square me-1"></i> Edit Transaksi`;
+            document.getElementById('btn-submit').innerText = "Simpan Perubahan";
+            document.getElementById('btn-submit').classList.replace('btn-primary', 'btn-warning');
+            document.getElementById('btn-batal').style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
 
-function renderTabel(data) {
-    const tbody = document.getElementById('tabel-transaksi-body');
-    tbody.innerHTML = '';
-    if (data.length === 0) return tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted">Belum ada transaksi.</td></tr>`;
+        function resetForm() {
+            document.getElementById('transaksi-form').reset();
+            document.getElementById('transaksi-id').value = '';
+            document.getElementById('form-title').innerHTML = `<i class="bi bi-plus-circle me-1"></i> Input Transaksi Baru`;
+            document.getElementById('btn-submit').innerText = "Simpan Data";
+            document.getElementById('btn-submit').classList.replace('btn-warning', 'btn-primary');
+            document.getElementById('btn-batal').style.display = 'none';
+            const hariIni = new Date().toISOString().split('T')[0];
+            document.getElementById('tanggal').value = hariIni;
+        }
 
-    data.forEach(item => {
-        const tr = document.createElement('tr');
-        tr.classList.add(item.tipe === 'pemasukan' ? 'table-success' : 'table-danger', 'table-opacity-10');
-        const btnAksi = isAdmin ? `
-            <td class="text-center d-print-none">
-                <button class="btn btn-sm btn-outline-primary py-0 px-1" onclick="aksiEdit(${item.id})"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="aksiHapus(${item.id})"><i class="bi bi-trash"></i></button>
-            </td>
-        ` : `<td style="display:none;" class="d-print-none"></td>`;
+        // ==========================================
+        // FUNGSI UMUM & FORMATTING
+        // ==========================================
+        function formatRupiah(angka) { return 'Rp ' + parseInt(angka).toLocaleString('id-ID'); }
+        function formatTanggalIndo(stringTanggal) {
+            if(!stringTanggal) return '-';
+            const parts = stringTanggal.split('T')[0].split('-');
+            if(parts.length !== 3) return stringTanggal;
+            const opsi = { year: 'numeric', month: 'short', day: 'numeric' };
+            return new Date(parts[0], parts[1]-1, parts[2]).toLocaleDateString('id-ID', opsi);
+        }
 
-        tr.innerHTML = `
-            <td>${formatTanggalIndo(item.tanggal)}</td>
-            <td><span class="fw-semibold">${item.jenis}</span></td>
-            <td class="text-muted small">${item.keterangan || '-'}</td>
-            <td class="text-end ${item.tipe === 'pemasukan' ? 'text-pemasukan' : 'text-pengeluaran'}">
-                ${item.tipe === 'pemasukan' ? '+' : '-'} ${formatRupiah(item.nominal)}
-            </td>
-            ${btnAksi}
-        `;
-        tbody.appendChild(tr);
-    });
-}
+        function muatDataVisual() {
+            const filterBulan = document.getElementById('filter-bulan').value;
+            const urutkan = document.getElementById('urutkan-berdasarkan').value;
+            
+            let dataProses = [...dataTransaksi];
 
-function renderChart(semuaData) {
-    const ctx = document.getElementById('chartTransaksi').getContext('2d');
-    const rekapBulan = {};
-    semuaData.forEach(item => {
-        if(!item.tanggal) return;
-        const bulanKey = String(item.tanggal).substring(0, 7); 
-        if(!rekapBulan[bulanKey]) rekapBulan[bulanKey] = { masuk: 0, keluar: 0 };
-        if(item.tipe === 'pemasukan') rekapBulan[bulanKey].masuk += item.nominal;
-        else rekapBulan[bulanKey].keluar += item.nominal;
-    });
+            if (filterBulan) {
+                dataProses = dataProses.filter(item => String(item.tanggal).startsWith(filterBulan));
+                const [thn, bln] = filterBulan.split('-');
+                document.getElementById('print-period-text').innerText = "Periode: " + new Date(thn, bln - 1).toLocaleString('id-ID', { month: 'long', year: 'numeric' });
+            } else {
+                document.getElementById('print-period-text').innerText = "Semua Riwayat Transaksi";
+            }
 
-    const labelBulan = Object.keys(rekapBulan).sort();
-    const formatNamaBulan = labelBulan.map(key => {
-        const [thn, bln] = key.split('-');
-        return new Date(thn, bln - 1).toLocaleString('id-ID', { month: 'short', year: 'numeric' });
-    });
+            if (urutkan === 'tanggal-desc') dataProses.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+            else if (urutkan === 'tanggal-asc') dataProses.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
+            else if (urutkan === 'jenis-asc') dataProses.sort((a, b) => a.jenis.localeCompare(b.jenis));
 
-    const dataPemasukan = labelBulan.map(key => rekapBulan[key].masuk);
-    const dataPengeluaran = labelBulan.map(key => rekapBulan[key].keluar);
+            hitungDashboard(dataProses);
+            hitungJumlahPerJenis(dataProses);
+            renderTabel(dataProses);
+            updateDatalistJenis();
+        }
 
-    if(chartInstance) chartInstance.destroy();
+        function hitungDashboard(data) {
+            let masuk = 0, keluar = 0;
+            data.forEach(item => { item.tipe === 'pemasukan' ? masuk += item.nominal : keluar += item.nominal; });
+            document.getElementById('total-pemasukan').innerText = formatRupiah(masuk);
+            document.getElementById('total-pengeluaran').innerText = formatRupiah(keluar);
+            document.getElementById('total-saldo').innerText = formatRupiah(masuk - keluar);
+            document.getElementById('total-item-count').innerText = data.length + " Transaksi";
+        }
 
-    chartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: formatNamaBulan,
-            datasets: [
-                { label: 'Pemasukan', data: dataPemasukan, backgroundColor: 'rgba(25, 135, 84, 0.7)', borderColor: 'rgba(25, 135, 84, 1)', borderWidth: 1 },
-                { label: 'Pengeluaran', data: dataPengeluaran, backgroundColor: 'rgba(220, 53, 69, 0.7)', borderColor: 'rgba(220, 53, 69, 1)', borderWidth: 1 }
-            ]
-        },
-        options: { responsive: true, plugins: { tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + formatRupiah(c.raw); } } } } }
-    });
-}
+        function hitungJumlahPerJenis(data) {
+            const rekap = {};
+            data.forEach(item => {
+                if (!rekap[item.jenis]) rekap[item.jenis] = { pemasukan: 0, pengeluaran: 0 };
+                item.tipe === 'pemasukan' ? rekap[item.jenis].pemasukan += item.nominal : rekap[item.jenis].pengeluaran += item.nominal;
+            });
 
-function resetFilter() {
-    document.getElementById('filter-bulan').value = '';
-    document.getElementById('urutkan-berdasarkan').value = 'tanggal-desc';
-    muatDataVisual();
-}
+            const container = document.getElementById('rekap-jenis-container');
+            container.innerHTML = '';
+            const keys = Object.keys(rekap);
+            if (keys.length === 0) return container.innerHTML = '<span class="text-muted small">Belum ada data.</span>';
 
-function updateDatalistJenis() {
-    const datalist = document.getElementById('jenis-list');
-    datalist.innerHTML = '';
-    [...new Set(dataTransaksi.map(item => item.jenis))].filter(Boolean).forEach(jenis => {
-        datalist.appendChild(new Option(jenis, jenis));
-    });
-}
+            keys.forEach(jenis => {
+                let badgeHTML = '';
+                if (rekap[jenis].pemasukan > 0) badgeHTML += `<span class="badge bg-pemasukan border me-1">${jenis} (+): ${formatRupiah(rekap[jenis].pemasukan)}</span>`;
+                if (rekap[jenis].pengeluaran > 0) badgeHTML += `<span class="badge bg-pengeluaran border">${jenis} (-): ${formatRupiah(rekap[jenis].pengeluaran)}</span>`;
+                container.innerHTML += `<div class="p-1 border rounded bg-light small d-inline-block">${badgeHTML}</div>`;
+            });
+        }
 
-// Hilangkan fitur Impor/Ekspor karena data sudah tersimpan aman di Google Drive
-function eksporData() { alert("Fitur dinonaktifkan. Data sudah otomatis dicadangkan di Google Spreadsheet."); }
-function imporData(input) { alert("Fitur dinonaktifkan. Silakan edit langsung di Google Spreadsheet jika perlu pemulihan massal."); }
+        function renderTabel(data) {
+            const tbody = document.getElementById('tabel-transaksi-body');
+            tbody.innerHTML = '';
+            if (data.length === 0) return tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted">Belum ada transaksi.</td></tr>`;
 
-// === JALANKAN SAAT PERTAMA DIBUKA ===
-renderUIAccess(); 
-resetForm();
-tarikDataDariSheets(); // Akan men-download data terbaru dari spreadsheet secara otomatis
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.classList.add(item.tipe === 'pemasukan' ? 'table-success' : 'table-danger', 'table-opacity-10');
+                const btnAksi = isAdmin ? `
+                    <td class="text-center d-print-none">
+                        <button class="btn btn-sm btn-outline-primary py-0 px-1" onclick="aksiEdit(${item.id})"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="aksiHapus(${item.id})"><i class="bi bi-trash"></i></button>
+                    </td>
+                ` : `<td style="display:none;" class="d-print-none"></td>`;
+
+                tr.innerHTML = `
+                    <td>${formatTanggalIndo(item.tanggal)}</td>
+                    <td><span class="fw-semibold">${item.jenis}</span></td>
+                    <td class="text-muted small">${item.keterangan || '-'}</td>
+                    <td class="text-end ${item.tipe === 'pemasukan' ? 'text-pemasukan' : 'text-pengeluaran'}">
+                        ${item.tipe === 'pemasukan' ? '+' : '-'} ${formatRupiah(item.nominal)}
+                    </td>
+                    ${btnAksi}
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function resetFilter() {
+            document.getElementById('filter-bulan').value = '';
+            document.getElementById('urutkan-berdasarkan').value = 'tanggal-desc';
+            muatDataVisual();
+        }
+
+        function updateDatalistJenis() {
+            const datalist = document.getElementById('jenis-list');
+            datalist.innerHTML = '';
+            [...new Set(dataTransaksi.map(item => item.jenis))].filter(Boolean).forEach(jenis => {
+                datalist.appendChild(new Option(jenis, jenis));
+            });
+        }
+
+        // === JALANKAN SAAT PERTAMA DIBUKA ===
+        jalankanJam();
+        tarikJadwalSholat();
+        renderUIAccess(); 
+        resetForm();
+        tarikDataDariSheets(); 
     </script>
 </body>
 </html>
