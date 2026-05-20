@@ -220,363 +220,328 @@
 
     <!-- Logika Aplikasi -->
     <script>
-        // --- KONFIGURASI KEAMANAN (GANTI PIN DI SINI) ---
-        const ADMIN_PIN = "permata123";
-        let isAdmin = false; 
+    // --- KONFIGURASI KEAMANAN & DATABASE ---
+const ADMIN_PIN = "permata123";
+let isAdmin = false; 
 
-        // Inisialisasi Data dan Chart
-        let dataTransaksi = JSON.parse(localStorage.getItem('PERMATA_DATA_KEUANGAN')) || [];
-        let chartInstance = null;
+// PASTE URL DARI GOOGLE APPS SCRIPT DI SINI:
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxi4X9wDnRPGg_j1TqEUqvzO4igiPmYriDYQztx42r5s1dAus2zSAcFm9ok0ZxEHVyQaA/exec"; 
 
-        document.getElementById('transaksi-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            if(isAdmin) simpanTransaksi();
+let dataTransaksi = [];
+let chartInstance = null;
+
+document.getElementById('transaksi-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if(isAdmin) simpanTransaksi();
+});
+
+// ==========================================
+// FUNGSI LOCK & UNLOCK
+// ==========================================
+function toggleLock() {
+    if (isAdmin) {
+        isAdmin = false;
+        alert("Akses Admin ditutup. Mode Publik diaktifkan.");
+        renderUIAccess();
+    } else {
+        const inputPin = prompt("Identifikasi Bendahara:");
+        if (inputPin === ADMIN_PIN) {
+            isAdmin = true;
+            renderUIAccess();
+        } else if (inputPin !== null) {
+            alert("Akses ditolak.");
+        }
+    }
+}
+
+function renderUIAccess() {
+    const formContainer = document.getElementById('form-container');
+    const dataContainer = document.getElementById('data-container');
+    const headerAksi = document.getElementById('header-aksi');
+    const logoIcon = document.getElementById('logo-icon');
+
+    if (isAdmin) {
+        formContainer.style.display = 'block';
+        dataContainer.classList.replace('col-lg-12', 'col-lg-8');
+        headerAksi.style.display = 'table-cell';
+        logoIcon.classList.replace('bi-wallet2', 'bi-unlock-fill');
+        logoIcon.classList.add('text-warning');
+    } else {
+        formContainer.style.display = 'none';
+        dataContainer.classList.replace('col-lg-8', 'col-lg-12');
+        headerAksi.style.display = 'none';
+        logoIcon.classList.replace('bi-unlock-fill', 'bi-wallet2');
+        logoIcon.classList.remove('text-warning');
+        resetForm(); 
+    }
+    muatDataVisual();
+}
+
+// ==========================================
+// KONEKSI KE GOOGLE SHEETS
+// ==========================================
+
+// Ambil data pertama kali saat web dibuka
+async function tarikDataDariSheets() {
+    document.getElementById('total-saldo').innerText = "Loading...";
+    try {
+        const response = await fetch(SCRIPT_URL);
+        const data = await response.json();
+        // Pastikan tipe data sesuai
+        dataTransaksi = data.map(item => ({
+            ...item,
+            id: parseInt(item.id),
+            nominal: parseFloat(item.nominal)
+        }));
+        muatDataVisual();
+    } catch (err) {
+        console.error("Gagal menarik data:", err);
+        document.getElementById('total-saldo').innerText = "Gagal Koneksi";
+    }
+}
+
+// Simpan atau Edit ke Sheets
+async function simpanTransaksi() {
+    const btnSubmit = document.getElementById('btn-submit');
+    const teksAsli = btnSubmit.innerText;
+    btnSubmit.innerText = "Menyimpan...";
+    btnSubmit.disabled = true;
+
+    const idInput = document.getElementById('transaksi-id').value;
+    const payload = {
+        id: idInput ? parseInt(idInput) : Date.now(),
+        tipe: document.querySelector('input[name="tipe"]:checked').value,
+        tanggal: document.getElementById('tanggal').value,
+        jenis: document.getElementById('jenis').value.trim(),
+        nominal: parseFloat(document.getElementById('nominal').value),
+        keterangan: document.getElementById('keterangan').value.trim()
+    };
+
+    // Update UI Instan (Optimistic Update)
+    if (idInput) {
+        const index = dataTransaksi.findIndex(item => item.id == idInput);
+        if (index !== -1) dataTransaksi[index] = payload;
+    } else {
+        dataTransaksi.push(payload);
+    }
+    muatDataVisual();
+    resetForm();
+
+    // Proses sinkronisasi ke Database di latar belakang
+    try {
+        await fetch(SCRIPT_URL + '?action=simpan', {
+            method: 'POST',
+            body: JSON.stringify(payload)
         });
+    } catch(err) {
+        alert("Gagal sinkronisasi ke database. Periksa koneksi.");
+    } finally {
+        btnSubmit.innerText = teksAsli;
+        btnSubmit.disabled = false;
+    }
+}
 
-        // ==========================================
-        // FUNGSI LOCK & UNLOCK (MODE ADMIN TERSEMBUNYI)
-        // ==========================================
-        function toggleLock() {
-            if (isAdmin) {
-                // Kunci kembali jika sudah login
-                isAdmin = false;
-                alert("Akses Admin telah ditutup. Mode Publik diaktifkan.");
-                renderUIAccess();
-            } else {
-                // Minta PIN secara tersembunyi
-                const inputPin = prompt("Identifikasi Bendahara:");
-                if (inputPin === ADMIN_PIN) {
-                    isAdmin = true;
-                    renderUIAccess();
-                } else if (inputPin !== null) {
-                    alert("Akses ditolak.");
-                }
-            }
+async function aksiHapus(id) {
+    if (!isAdmin) return;
+    if (confirm("Hapus data transaksi ini secara permanen dari Database?")) {
+        // Update UI Instan
+        dataTransaksi = dataTransaksi.filter(item => item.id !== id);
+        muatDataVisual();
+
+        // Hapus dari Sheets
+        try {
+            await fetch(SCRIPT_URL + '?action=hapus&id=' + id, { method: 'POST' });
+        } catch(err) {
+            console.error(err);
         }
+    }
+}
 
-        function renderUIAccess() {
-            const formContainer = document.getElementById('form-container');
-            const dataContainer = document.getElementById('data-container');
-            const headerAksi = document.getElementById('header-aksi');
-            const logoIcon = document.getElementById('logo-icon');
+function aksiEdit(id) {
+    if (!isAdmin) return;
+    const transaksi = dataTransaksi.find(item => item.id === id);
+    if (!transaksi) return;
 
-            if (isAdmin) {
-                // Tampilan saat Admin berhasil login
-                formContainer.style.display = 'block';
-                dataContainer.classList.replace('col-lg-12', 'col-lg-8');
-                headerAksi.style.display = 'table-cell';
-                
-                // Ubah ikon menjadi gembok terbuka kuning sebagai penanda visual bagi Anda
-                logoIcon.classList.replace('bi-wallet2', 'bi-unlock-fill');
-                logoIcon.classList.add('text-warning');
-            } else {
-                // Tampilan Publik
-                formContainer.style.display = 'none';
-                dataContainer.classList.replace('col-lg-8', 'col-lg-12');
-                headerAksi.style.display = 'none';
-                
-                // Kembalikan ikon ke dompet biasa
-                logoIcon.classList.replace('bi-unlock-fill', 'bi-wallet2');
-                logoIcon.classList.remove('text-warning');
-                
-                resetForm(); // Bersihkan form jika ditutup saat sedang edit
-            }
-            
-            muatData();
-        }
+    document.getElementById('transaksi-id').value = transaksi.id;
+    document.getElementById('tanggal').value = transaksi.tanggal;
+    document.getElementById('jenis').value = transaksi.jenis;
+    document.getElementById('nominal').value = transaksi.nominal;
+    document.getElementById('keterangan').value = transaksi.keterangan;
+    document.getElementById(`tipe-${transaksi.tipe}`).checked = true;
 
-        // ==========================================
-        // FUNGSI UMUM & FORMATTING
-        // ==========================================
-        function formatRupiah(angka) {
-            return 'Rp ' + parseInt(angka).toLocaleString('id-ID');
-        }
+    document.getElementById('form-title').innerHTML = `<i class="bi bi-pencil-square me-1"></i> Edit Transaksi`;
+    document.getElementById('btn-submit').innerText = "Simpan Perubahan";
+    document.getElementById('btn-submit').classList.replace('btn-primary', 'btn-warning');
+    document.getElementById('btn-batal').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
-        function formatTanggalIndo(stringTanggal) {
-            const opsi = { year: 'numeric', month: 'short', day: 'numeric' };
-            return new Date(stringTanggal).toLocaleDateString('id-ID', opsi);
-        }
+function resetForm() {
+    document.getElementById('transaksi-form').reset();
+    document.getElementById('transaksi-id').value = '';
+    document.getElementById('form-title').innerHTML = `<i class="bi bi-plus-circle me-1"></i> Input Transaksi Baru`;
+    document.getElementById('btn-submit').innerText = "Simpan Data";
+    document.getElementById('btn-submit').classList.replace('btn-warning', 'btn-primary');
+    document.getElementById('btn-batal').style.display = 'none';
+    const hariIni = new Date().toISOString().split('T')[0];
+    document.getElementById('tanggal').value = hariIni;
+}
 
-        function setTanggalHariIni() {
-            const hariIni = new Date().toISOString().split('T')[0];
-            document.getElementById('tanggal').value = hariIni;
-        }
+// ==========================================
+// FUNGSI UMUM & FORMATTING
+// ==========================================
+function formatRupiah(angka) { return 'Rp ' + parseInt(angka).toLocaleString('id-ID'); }
+function formatTanggalIndo(stringTanggal) {
+    if(!stringTanggal) return '-';
+    // Menghindari error timezone GAS dengan memecah string YYYY-MM-DD
+    const parts = stringTanggal.split('T')[0].split('-');
+    if(parts.length !== 3) return stringTanggal;
+    const opsi = { year: 'numeric', month: 'short', day: 'numeric' };
+    return new Date(parts[0], parts[1]-1, parts[2]).toLocaleDateString('id-ID', opsi);
+}
 
-        // ==========================================
-        // MANAJEMEN DATA & PENYIMPANAN
-        // ==========================================
-        function simpanTransaksi() {
-            const id = document.getElementById('transaksi-id').value;
-            const tipe = document.querySelector('input[name="tipe"]:checked').value;
-            const tanggal = document.getElementById('tanggal').value;
-            const jenis = document.getElementById('jenis').value.trim();
-            const nominal = parseFloat(document.getElementById('nominal').value);
-            const keterangan = document.getElementById('keterangan').value.trim();
+// ==========================================
+// RENDER UI & CHART
+// ==========================================
+function muatDataVisual() {
+    const filterBulan = document.getElementById('filter-bulan').value;
+    const urutkan = document.getElementById('urutkan-berdasarkan').value;
+    
+    let dataProses = [...dataTransaksi];
 
-            if (id) {
-                const index = dataTransaksi.findIndex(item => item.id == id);
-                if (index !== -1) dataTransaksi[index] = { id: parseInt(id), tipe, tanggal, jenis, nominal, keterangan };
-            } else {
-                dataTransaksi.push({ id: Date.now(), tipe, tanggal, jenis, nominal, keterangan });
-            }
+    if (filterBulan) {
+        dataProses = dataProses.filter(item => String(item.tanggal).startsWith(filterBulan));
+        const [thn, bln] = filterBulan.split('-');
+        document.getElementById('print-period-text').innerText = "Periode: " + new Date(thn, bln - 1).toLocaleString('id-ID', { month: 'long', year: 'numeric' });
+    } else {
+        document.getElementById('print-period-text').innerText = "Semua Riwayat Transaksi";
+    }
 
-            localStorage.setItem('PERMATA_DATA_KEUANGAN', JSON.stringify(dataTransaksi));
-            resetForm();
-            muatData();
-        }
+    if (urutkan === 'tanggal-desc') dataProses.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+    else if (urutkan === 'tanggal-asc') dataProses.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
+    else if (urutkan === 'jenis-asc') dataProses.sort((a, b) => a.jenis.localeCompare(b.jenis));
 
-        function aksiHapus(id) {
-            if (!isAdmin) return;
-            if (confirm("Hapus data transaksi ini?")) {
-                dataTransaksi = dataTransaksi.filter(item => item.id !== id);
-                localStorage.setItem('PERMATA_DATA_KEUANGAN', JSON.stringify(dataTransaksi));
-                muatData();
-            }
-        }
+    hitungDashboard(dataProses);
+    hitungJumlahPerJenis(dataProses);
+    renderTabel(dataProses);
+    updateDatalistJenis();
+    renderChart(dataTransaksi); 
+}
 
-        function aksiEdit(id) {
-            if (!isAdmin) return;
-            const transaksi = dataTransaksi.find(item => item.id === id);
-            if (!transaksi) return;
+function hitungDashboard(data) {
+    let masuk = 0, keluar = 0;
+    data.forEach(item => { item.tipe === 'pemasukan' ? masuk += item.nominal : keluar += item.nominal; });
+    document.getElementById('total-pemasukan').innerText = formatRupiah(masuk);
+    document.getElementById('total-pengeluaran').innerText = formatRupiah(keluar);
+    document.getElementById('total-saldo').innerText = formatRupiah(masuk - keluar);
+    document.getElementById('total-item-count').innerText = data.length + " Transaksi";
+}
 
-            document.getElementById('transaksi-id').value = transaksi.id;
-            document.getElementById('tanggal').value = transaksi.tanggal;
-            document.getElementById('jenis').value = transaksi.jenis;
-            document.getElementById('nominal').value = transaksi.nominal;
-            document.getElementById('keterangan').value = transaksi.keterangan;
-            document.getElementById(`tipe-${transaksi.tipe}`).checked = true;
+function hitungJumlahPerJenis(data) {
+    const rekap = {};
+    data.forEach(item => {
+        if (!rekap[item.jenis]) rekap[item.jenis] = { pemasukan: 0, pengeluaran: 0 };
+        item.tipe === 'pemasukan' ? rekap[item.jenis].pemasukan += item.nominal : rekap[item.jenis].pengeluaran += item.nominal;
+    });
 
-            document.getElementById('form-title').innerHTML = `<i class="bi bi-pencil-square me-1"></i> Edit Transaksi`;
-            document.getElementById('btn-submit').innerText = "Simpan Perubahan";
-            document.getElementById('btn-submit').classList.replace('btn-primary', 'btn-warning');
-            document.getElementById('btn-batal').style.display = 'block';
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+    const container = document.getElementById('rekap-jenis-container');
+    container.innerHTML = '';
+    const keys = Object.keys(rekap);
+    if (keys.length === 0) return container.innerHTML = '<span class="text-muted small">Belum ada data.</span>';
 
-        function resetForm() {
-            document.getElementById('transaksi-form').reset();
-            document.getElementById('transaksi-id').value = '';
-            document.getElementById('form-title').innerHTML = `<i class="bi bi-plus-circle me-1"></i> Input Transaksi Baru`;
-            document.getElementById('btn-submit').innerText = "Simpan Data";
-            document.getElementById('btn-submit').classList.replace('btn-warning', 'btn-primary');
-            document.getElementById('btn-batal').style.display = 'none';
-            setTanggalHariIni();
-        }
+    keys.forEach(jenis => {
+        let badgeHTML = '';
+        if (rekap[jenis].pemasukan > 0) badgeHTML += `<span class="badge bg-pemasukan border me-1">${jenis} (+): ${formatRupiah(rekap[jenis].pemasukan)}</span>`;
+        if (rekap[jenis].pengeluaran > 0) badgeHTML += `<span class="badge bg-pengeluaran border">${jenis} (-): ${formatRupiah(rekap[jenis].pengeluaran)}</span>`;
+        container.innerHTML += `<div class="p-1 border rounded bg-light small d-inline-block">${badgeHTML}</div>`;
+    });
+}
 
-        // ==========================================
-        // RENDER UI & CHART
-        // ==========================================
-        function muatData() {
-            const filterBulan = document.getElementById('filter-bulan').value;
-            const urutkan = document.getElementById('urutkan-berdasarkan').value;
-            
-            let dataProses = [...dataTransaksi];
+function renderTabel(data) {
+    const tbody = document.getElementById('tabel-transaksi-body');
+    tbody.innerHTML = '';
+    if (data.length === 0) return tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted">Belum ada transaksi.</td></tr>`;
 
-            if (filterBulan) {
-                dataProses = dataProses.filter(item => item.tanggal.startsWith(filterBulan));
-                const [thn, bln] = filterBulan.split('-');
-                document.getElementById('print-period-text').innerText = "Periode: " + new Date(thn, bln - 1).toLocaleString('id-ID', { month: 'long', year: 'numeric' });
-            } else {
-                document.getElementById('print-period-text').innerText = "Semua Riwayat Transaksi";
-            }
+    data.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.classList.add(item.tipe === 'pemasukan' ? 'table-success' : 'table-danger', 'table-opacity-10');
+        const btnAksi = isAdmin ? `
+            <td class="text-center d-print-none">
+                <button class="btn btn-sm btn-outline-primary py-0 px-1" onclick="aksiEdit(${item.id})"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="aksiHapus(${item.id})"><i class="bi bi-trash"></i></button>
+            </td>
+        ` : `<td style="display:none;" class="d-print-none"></td>`;
 
-            if (urutkan === 'tanggal-desc') dataProses.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
-            else if (urutkan === 'tanggal-asc') dataProses.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
-            else if (urutkan === 'jenis-asc') dataProses.sort((a, b) => a.jenis.localeCompare(b.jenis));
+        tr.innerHTML = `
+            <td>${formatTanggalIndo(item.tanggal)}</td>
+            <td><span class="fw-semibold">${item.jenis}</span></td>
+            <td class="text-muted small">${item.keterangan || '-'}</td>
+            <td class="text-end ${item.tipe === 'pemasukan' ? 'text-pemasukan' : 'text-pengeluaran'}">
+                ${item.tipe === 'pemasukan' ? '+' : '-'} ${formatRupiah(item.nominal)}
+            </td>
+            ${btnAksi}
+        `;
+        tbody.appendChild(tr);
+    });
+}
 
-            hitungDashboard(dataProses);
-            hitungJumlahPerJenis(dataProses);
-            renderTabel(dataProses);
-            updateDatalistJenis();
-            renderChart(dataTransaksi); 
-        }
+function renderChart(semuaData) {
+    const ctx = document.getElementById('chartTransaksi').getContext('2d');
+    const rekapBulan = {};
+    semuaData.forEach(item => {
+        if(!item.tanggal) return;
+        const bulanKey = String(item.tanggal).substring(0, 7); 
+        if(!rekapBulan[bulanKey]) rekapBulan[bulanKey] = { masuk: 0, keluar: 0 };
+        if(item.tipe === 'pemasukan') rekapBulan[bulanKey].masuk += item.nominal;
+        else rekapBulan[bulanKey].keluar += item.nominal;
+    });
 
-        function hitungDashboard(data) {
-            let masuk = 0, keluar = 0;
-            data.forEach(item => { item.tipe === 'pemasukan' ? masuk += item.nominal : keluar += item.nominal; });
-            document.getElementById('total-pemasukan').innerText = formatRupiah(masuk);
-            document.getElementById('total-pengeluaran').innerText = formatRupiah(keluar);
-            document.getElementById('total-saldo').innerText = formatRupiah(masuk - keluar);
-            document.getElementById('total-item-count').innerText = data.length + " Transaksi";
-        }
+    const labelBulan = Object.keys(rekapBulan).sort();
+    const formatNamaBulan = labelBulan.map(key => {
+        const [thn, bln] = key.split('-');
+        return new Date(thn, bln - 1).toLocaleString('id-ID', { month: 'short', year: 'numeric' });
+    });
 
-        function hitungJumlahPerJenis(data) {
-            const rekap = {};
-            data.forEach(item => {
-                if (!rekap[item.jenis]) rekap[item.jenis] = { pemasukan: 0, pengeluaran: 0 };
-                item.tipe === 'pemasukan' ? rekap[item.jenis].pemasukan += item.nominal : rekap[item.jenis].pengeluaran += item.nominal;
-            });
+    const dataPemasukan = labelBulan.map(key => rekapBulan[key].masuk);
+    const dataPengeluaran = labelBulan.map(key => rekapBulan[key].keluar);
 
-            const container = document.getElementById('rekap-jenis-container');
-            container.innerHTML = '';
-            const keys = Object.keys(rekap);
-            if (keys.length === 0) return container.innerHTML = '<span class="text-muted small">Belum ada data.</span>';
+    if(chartInstance) chartInstance.destroy();
 
-            keys.forEach(jenis => {
-                let badgeHTML = '';
-                if (rekap[jenis].pemasukan > 0) badgeHTML += `<span class="badge bg-pemasukan border me-1">${jenis} (+): ${formatRupiah(rekap[jenis].pemasukan)}</span>`;
-                if (rekap[jenis].pengeluaran > 0) badgeHTML += `<span class="badge bg-pengeluaran border">${jenis} (-): ${formatRupiah(rekap[jenis].pengeluaran)}</span>`;
-                container.innerHTML += `<div class="p-1 border rounded bg-light small d-inline-block">${badgeHTML}</div>`;
-            });
-        }
+    chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: formatNamaBulan,
+            datasets: [
+                { label: 'Pemasukan', data: dataPemasukan, backgroundColor: 'rgba(25, 135, 84, 0.7)', borderColor: 'rgba(25, 135, 84, 1)', borderWidth: 1 },
+                { label: 'Pengeluaran', data: dataPengeluaran, backgroundColor: 'rgba(220, 53, 69, 0.7)', borderColor: 'rgba(220, 53, 69, 1)', borderWidth: 1 }
+            ]
+        },
+        options: { responsive: true, plugins: { tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + formatRupiah(c.raw); } } } } }
+    });
+}
 
-        function renderTabel(data) {
-            const tbody = document.getElementById('tabel-transaksi-body');
-            tbody.innerHTML = '';
-            if (data.length === 0) return tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted">Belum ada transaksi.</td></tr>`;
+function resetFilter() {
+    document.getElementById('filter-bulan').value = '';
+    document.getElementById('urutkan-berdasarkan').value = 'tanggal-desc';
+    muatDataVisual();
+}
 
-            data.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.classList.add(item.tipe === 'pemasukan' ? 'table-success' : 'table-danger', 'table-opacity-10');
-                const btnAksi = isAdmin ? `
-                    <td class="text-center d-print-none">
-                        <button class="btn btn-sm btn-outline-primary py-0 px-1" onclick="aksiEdit(${item.id})"><i class="bi bi-pencil"></i></button>
-                        <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="aksiHapus(${item.id})"><i class="bi bi-trash"></i></button>
-                    </td>
-                ` : `<td style="display:none;" class="d-print-none"></td>`;
+function updateDatalistJenis() {
+    const datalist = document.getElementById('jenis-list');
+    datalist.innerHTML = '';
+    [...new Set(dataTransaksi.map(item => item.jenis))].filter(Boolean).forEach(jenis => {
+        datalist.appendChild(new Option(jenis, jenis));
+    });
+}
 
-                tr.innerHTML = `
-                    <td>${formatTanggalIndo(item.tanggal)}</td>
-                    <td><span class="fw-semibold">${item.jenis}</span></td>
-                    <td class="text-muted small">${item.keterangan || '-'}</td>
-                    <td class="text-end ${item.tipe === 'pemasukan' ? 'text-pemasukan' : 'text-pengeluaran'}">
-                        ${item.tipe === 'pemasukan' ? '+' : '-'} ${formatRupiah(item.nominal)}
-                    </td>
-                    ${btnAksi}
-                `;
-                tbody.appendChild(tr);
-            });
-        }
+// Hilangkan fitur Impor/Ekspor karena data sudah tersimpan aman di Google Drive
+function eksporData() { alert("Fitur dinonaktifkan. Data sudah otomatis dicadangkan di Google Spreadsheet."); }
+function imporData(input) { alert("Fitur dinonaktifkan. Silakan edit langsung di Google Spreadsheet jika perlu pemulihan massal."); }
 
-        // ==========================================
-        // LOGIKA GRAFIK (CHART.JS)
-        // ==========================================
-        function renderChart(semuaData) {
-            const ctx = document.getElementById('chartTransaksi').getContext('2d');
-            
-            const rekapBulan = {};
-            semuaData.forEach(item => {
-                const bulanKey = item.tanggal.substring(0, 7); 
-                if(!rekapBulan[bulanKey]) rekapBulan[bulanKey] = { masuk: 0, keluar: 0 };
-                if(item.tipe === 'pemasukan') rekapBulan[bulanKey].masuk += item.nominal;
-                else rekapBulan[bulanKey].keluar += item.nominal;
-            });
-
-            const labelBulan = Object.keys(rekapBulan).sort();
-            
-            const formatNamaBulan = labelBulan.map(key => {
-                const [thn, bln] = key.split('-');
-                return new Date(thn, bln - 1).toLocaleString('id-ID', { month: 'short', year: 'numeric' });
-            });
-
-            const dataPemasukan = labelBulan.map(key => rekapBulan[key].masuk);
-            const dataPengeluaran = labelBulan.map(key => rekapBulan[key].keluar);
-
-            if(chartInstance) {
-                chartInstance.destroy();
-            }
-
-            chartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: formatNamaBulan,
-                    datasets: [
-                        {
-                            label: 'Pemasukan',
-                            data: dataPemasukan,
-                            backgroundColor: 'rgba(25, 135, 84, 0.7)',
-                            borderColor: 'rgba(25, 135, 84, 1)',
-                            borderWidth: 1,
-                            borderRadius: 4
-                        },
-                        {
-                            label: 'Pengeluaran',
-                            data: dataPengeluaran,
-                            backgroundColor: 'rgba(220, 53, 69, 0.7)',
-                            borderColor: 'rgba(220, 53, 69, 1)',
-                            borderWidth: 1,
-                            borderRadius: 4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: 'top' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.dataset.label + ': ' + formatRupiah(context.raw);
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: { 
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    if(value >= 1000000) return 'Rp ' + (value/1000000) + ' Jt';
-                                    if(value >= 1000) return 'Rp ' + (value/1000) + ' Rb';
-                                    return value;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        // ==========================================
-        // EKSPOR & IMPOR & INISIALISASI
-        // ==========================================
-        function resetFilter() {
-            document.getElementById('filter-bulan').value = '';
-            document.getElementById('urutkan-berdasarkan').value = 'tanggal-desc';
-            muatData();
-        }
-
-        function updateDatalistJenis() {
-            const datalist = document.getElementById('jenis-list');
-            datalist.innerHTML = '';
-            [...new Set(dataTransaksi.map(item => item.jenis))].forEach(jenis => {
-                datalist.appendChild(new Option(jenis, jenis));
-            });
-        }
-
-        function eksporData() {
-            if(!isAdmin) { alert("Hanya admin yang dapat mencadangkan data."); return; }
-            if(dataTransaksi.length === 0) return alert("Belum ada data.");
-            const a = document.createElement('a');
-            a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataTransaksi));
-            a.download = "BACKUP_PERMATA_" + new Date().toISOString().split('T')[0] + ".json";
-            document.body.appendChild(a); a.click(); a.remove();
-        }
-
-        function imporData(input) {
-            if(!isAdmin) return;
-            const file = input.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const dataImpor = JSON.parse(e.target.result);
-                    if (Array.isArray(dataImpor) && confirm("Timpa data saat ini dengan backup?")) {
-                        dataTransaksi = dataImpor;
-                        localStorage.setItem('PERMATA_DATA_KEUANGAN', JSON.stringify(dataTransaksi));
-                        muatData();
-                        alert("Data dipulihkan!");
-                    }
-                } catch (err) { alert("Format berkas salah."); }
-            };
-            reader.readAsText(file);
-            input.value = ''; 
-        }
-
-        // Jalankan saat pertama dimuat
-        renderUIAccess(); 
-        setTanggalHariIni();
-        muatData();
+// === JALANKAN SAAT PERTAMA DIBUKA ===
+renderUIAccess(); 
+resetForm();
+tarikDataDariSheets(); // Akan men-download data terbaru dari spreadsheet secara otomatis
     </script>
 </body>
 </html>
