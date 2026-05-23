@@ -273,26 +273,27 @@ async function tarikJadwalSholat() {
         
         if(result.code === 200) {
             const times = result.data.timings;
+            // PERUBAHAN: Tampilan diperkecil dan diberi warna-warni yang estetik
             container.innerHTML = `
-                <div class="sholat-item rounded p-2 flex-fill border border-light border-opacity-25">
-                    <div class="small opacity-75">Subuh</div>
-                    <div class="fw-bold fs-5">${times.Fajr}</div>
+                <div class="sholat-item rounded px-2 py-1 flex-fill border border-info border-opacity-50" style="background: rgba(13, 202, 240, 0.15);">
+                    <div style="font-size: 0.65rem; letter-spacing: 0.5px;" class="text-info text-uppercase fw-bold mb-1">Subuh</div>
+                    <div class="fw-bold text-white" style="font-size: 0.85rem;">${times.Fajr}</div>
                 </div>
-                <div class="sholat-item rounded p-2 flex-fill border border-light border-opacity-25">
-                    <div class="small opacity-75">Dzuhur</div>
-                    <div class="fw-bold fs-5">${times.Dhuhr}</div>
+                <div class="sholat-item rounded px-2 py-1 flex-fill border border-warning border-opacity-50" style="background: rgba(255, 193, 7, 0.15);">
+                    <div style="font-size: 0.65rem; letter-spacing: 0.5px;" class="text-warning text-uppercase fw-bold mb-1">Dzuhur</div>
+                    <div class="fw-bold text-white" style="font-size: 0.85rem;">${times.Dhuhr}</div>
                 </div>
-                <div class="sholat-item rounded p-2 flex-fill border border-light border-opacity-25">
-                    <div class="small opacity-75">Ashar</div>
-                    <div class="fw-bold fs-5">${times.Asr}</div>
+                <div class="sholat-item rounded px-2 py-1 flex-fill border border-success border-opacity-50" style="background: rgba(25, 135, 84, 0.15);">
+                    <div style="font-size: 0.65rem; letter-spacing: 0.5px;" class="text-success text-uppercase fw-bold mb-1">Ashar</div>
+                    <div class="fw-bold text-white" style="font-size: 0.85rem;">${times.Asr}</div>
                 </div>
-                <div class="sholat-item rounded p-2 flex-fill border border-light border-opacity-25">
-                    <div class="small opacity-75">Maghrib</div>
-                    <div class="fw-bold fs-5">${times.Maghrib}</div>
+                <div class="sholat-item rounded px-2 py-1 flex-fill border border-danger border-opacity-50" style="background: rgba(220, 53, 69, 0.15);">
+                    <div style="font-size: 0.65rem; letter-spacing: 0.5px;" class="text-danger text-uppercase fw-bold mb-1">Maghrib</div>
+                    <div class="fw-bold text-white" style="font-size: 0.85rem;">${times.Maghrib}</div>
                 </div>
-                <div class="sholat-item rounded p-2 flex-fill border border-light border-opacity-25">
-                    <div class="small opacity-75">Isya</div>
-                    <div class="fw-bold fs-5">${times.Isha}</div>
+                <div class="sholat-item rounded px-2 py-1 flex-fill border" style="border-color: #d63384; background: rgba(214, 51, 132, 0.15);">
+                    <div style="font-size: 0.65rem; letter-spacing: 0.5px; color: #ff85c0;" class="text-uppercase fw-bold mb-1">Isya</div>
+                    <div class="fw-bold text-white" style="font-size: 0.85rem;">${times.Isha}</div>
                 </div>
             `;
         }
