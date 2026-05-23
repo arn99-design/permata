@@ -833,45 +833,53 @@
 
         function hitungJumlahPerJenis(data) {
 
-            const rekap = {};
+    const rekap = {};
 
-            data.forEach(item => {
+    data.forEach(item => {
 
-                if (!rekap[item.jenis]) {
+        // HANYA HITUNG PEMASUKAN
+        if (item.tipe !== 'pemasukan') return;
 
-                    rekap[item.jenis] = {
-                        pemasukan: 0,
-                        pengeluaran: 0
-                    };
-                }
-
-                item.tipe === 'pemasukan'
-                    ? rekap[item.jenis].pemasukan += item.nominal
-                    : rekap[item.jenis].pengeluaran += item.nominal;
-            });
-
-            const container =
-                document.getElementById('rekap-jenis-container');
-
-            container.innerHTML = '';
-
-            Object.keys(rekap).forEach(jenis => {
-
-                container.innerHTML += `
-                    <div class="p-1 border rounded bg-light small d-inline-block">
-
-                        <span class="badge bg-pemasukan border me-1">
-                            ${jenis} (+): ${formatRupiah(rekap[jenis].pemasukan)}
-                        </span>
-
-                        <span class="badge bg-pengeluaran border">
-                            ${jenis} (-): ${formatRupiah(rekap[jenis].pengeluaran)}
-                        </span>
-
-                    </div>
-                `;
-            });
+        if (!rekap[item.jenis]) {
+            rekap[item.jenis] = 0;
         }
+
+        rekap[item.jenis] += item.nominal;
+    });
+
+    const container =
+        document.getElementById('rekap-jenis-container');
+
+    container.innerHTML = '';
+
+    const daftarJenis = Object.keys(rekap);
+
+    if (daftarJenis.length === 0) {
+
+        container.innerHTML = `
+            <span class="text-muted small">
+                Belum ada data pemasukan.
+            </span>
+        `;
+
+        return;
+    }
+
+    daftarJenis.forEach(jenis => {
+
+        container.innerHTML += `
+            <div class="p-1 border rounded bg-light small d-inline-block">
+
+                <span class="badge bg-pemasukan border">
+
+                    ${jenis}: ${formatRupiah(rekap[jenis])}
+
+                </span>
+
+            </div>
+        `;
+    });
+}
 
         function renderTabel(data) {
 
