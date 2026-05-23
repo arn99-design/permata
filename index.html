@@ -198,7 +198,7 @@
                         <span class="badge bg-secondary" id="total-item-count">0 Transaksi</span>
                     </div>
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
+                        <table class="table table-hover table-bordered table-sm align-middle mb-0" style="font-size: 0.85rem;">
                             <thead class="table-dark">
                                 <tr>
                                     <th style="width: 15%">Tanggal</th>
@@ -546,9 +546,9 @@ function renderTabel(data) {
             <td>${formatTanggalIndo(item.tanggal)}</td>
             <td><span class="fw-semibold">${item.jenis}</span></td>
             <td class="text-muted small">${item.keterangan || '-'}</td>
-            <td class="text-end ${tipeAman === 'pemasukan' ? 'text-pemasukan' : 'text-pengeluaran'}">
-                ${tipeAman === 'pemasukan' ? '+' : '-'} ${formatRupiah(item.nominal)}
-            </td>
+            <td class="text-end text-nowrap ${tipeAman === 'pemasukan' ? 'text-pemasukan' : 'text-pengeluaran'}">
+    ${tipeAman === 'pemasukan' ? '+' : '-'} ${formatRupiah(item.nominal)}
+</td>
             ${btnAksi}
         `;
         tbody.appendChild(tr);
